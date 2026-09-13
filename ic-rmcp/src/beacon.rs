@@ -110,11 +110,11 @@ pub fn start_timer(context: &mut BeaconContext) {
     context.state.borrow_mut().last_send_timestamp_ns = ic_cdk::api::time() as i64;
 
     let state = Rc::clone(&context.state);
-    let tracker_canister_id = context.tracker_canister_id.clone();
+    let tracker_canister_id = context.tracker_canister_id;
     let interval = Duration::from_secs(context.reporting_interval_seconds);
     context.timer_id = Some(set_timer_interval(interval, move || {
         let state = Rc::clone(&state);
-        let tracker_canister_id = tracker_canister_id.clone();
+        let tracker_canister_id = tracker_canister_id;
         ic_cdk::futures::spawn(async move {
             let _ = send_beacon(state, tracker_canister_id).await;
         });
@@ -142,7 +142,7 @@ fn take_report(state: &Rc<RefCell<BeaconState>>, end_timestamp_ns: i64) -> Optio
         .iter()
         .flat_map(|(caller, tools)| {
             tools.iter().map(|(tool_id, call_count)| CallerActivity {
-                caller: caller.clone(),
+                caller: *caller,
                 tool_id: tool_id.clone(),
                 call_count: *call_count,
             })
@@ -233,8 +233,8 @@ mod tests {
         let context = init(Principal::anonymous(), Some(60));
         let caller = Principal::from_text("2vxsx-fae").unwrap();
 
-        track_call(&context, caller.clone(), "search");
-        track_call(&context, caller.clone(), "search");
+        track_call(&context, caller, "search");
+        track_call(&context, caller, "search");
         track_call(&context, caller, "read");
 
         let state = context.state.borrow();
@@ -248,7 +248,7 @@ mod tests {
     #[test]
     fn successful_delivery_sends_the_expected_payload_and_commits_timestamp() {
         let tracker = Principal::from_text("aaaaa-aa").unwrap();
-        let context = init(tracker.clone(), Some(60));
+        let context = init(tracker, Some(60));
         context.state.borrow_mut().last_send_timestamp_ns = 10;
         track_call(
             &context,
@@ -265,7 +265,7 @@ mod tests {
         let captured_for_sender = Rc::clone(&captured);
         let result = block_on(send_report_with(
             Rc::clone(&context.state),
-            tracker.clone(),
+            tracker,
             25,
             move |called_tracker, stats| {
                 *captured_for_sender.borrow_mut() = Some((called_tracker, stats));
@@ -289,7 +289,7 @@ mod tests {
     fn failed_delivery_restores_usage_for_the_next_attempt() {
         let context = init(Principal::anonymous(), Some(60));
         let caller = Principal::from_text("2vxsx-fae").unwrap();
-        track_call(&context, caller.clone(), "search");
+        track_call(&context, caller, "search");
 
         let result = block_on(send_report_with(
             Rc::clone(&context.state),
