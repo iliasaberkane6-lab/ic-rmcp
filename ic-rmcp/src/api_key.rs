@@ -211,24 +211,10 @@ mod tests {
     fn each_random_value_produces_a_distinct_hashed_key() {
         let owner = principal("2vxsx-fae");
         let context = init(owner);
-        let first = create_api_key_from_random(
-            &context,
-            owner,
-            "first",
-            vec![],
-            &[0; 32],
-            1,
-        )
-        .unwrap();
-        let second = create_api_key_from_random(
-            &context,
-            owner,
-            "second",
-            vec![],
-            &[1; 32],
-            2,
-        )
-        .unwrap();
+        let first =
+            create_api_key_from_random(&context, owner, "first", vec![], &[0; 32], 1).unwrap();
+        let second =
+            create_api_key_from_random(&context, owner, "second", vec![], &[1; 32], 2).unwrap();
 
         assert_ne!(first, second);
         assert_eq!(list_my_api_keys(&context, owner).len(), 2);
