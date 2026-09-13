@@ -14,6 +14,7 @@ mod handler;
 pub use handler::{Context, Handler};
 
 /// Optional usage reporting for Prometheus Protocol-compatible MCP servers.
+#[cfg(feature = "beacon")]
 pub mod beacon;
 
 mod server;

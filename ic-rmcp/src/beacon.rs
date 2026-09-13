@@ -5,7 +5,7 @@
 //! module is deliberately independent from [`crate::Handler`], so applications
 //! can decide where authentication and tool dispatch should call [`track_call`].
 
-use candid::{CandidType, Principal};
+use candid::{CandidType, Int, Nat, Principal};
 use ic_cdk::call::Call;
 use ic_cdk_timers::{clear_timer, set_timer_interval, TimerId};
 use serde::Deserialize;
@@ -27,16 +27,16 @@ pub struct CallerActivity {
     /// Application-defined MCP tool name or identifier.
     pub tool_id: String,
     /// Number of calls made by `caller` to `tool_id`.
-    pub call_count: u64,
+    pub call_count: Nat,
 }
 
 /// Usage payload accepted by the Prometheus UsageTracker canister.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct UsageStats {
     /// Start of the reporting window, in IC nanoseconds.
-    pub start_timestamp_ns: i64,
+    pub start_timestamp_ns: Int,
     /// End of the reporting window, in IC nanoseconds.
-    pub end_timestamp_ns: i64,
+    pub end_timestamp_ns: Int,
     /// Aggregated caller/tool activity for the window.
     pub activity: Vec<CallerActivity>,
 }
@@ -107,7 +107,10 @@ pub fn start_timer(context: &mut BeaconContext) {
         clear_timer(timer_id);
     }
 
-    context.state.borrow_mut().last_send_timestamp_ns = ic_cdk::api::time() as i64;
+    let now = ic_cdk::api::time() as i64;
+    let mut state = context.state.borrow_mut();
+    state.last_send_timestamp_ns = state.last_send_timestamp_ns.max(now);
+    drop(state);
 
     let state = Rc::clone(&context.state);
     let tracker_canister_id = context.tracker_canister_id;
@@ -116,7 +119,9 @@ pub fn start_timer(context: &mut BeaconContext) {
         let state = Rc::clone(&state);
         let tracker_canister_id = tracker_canister_id;
         ic_cdk::futures::spawn(async move {
-            let _ = send_beacon(state, tracker_canister_id).await;
+            if let Err(error) = send_beacon(state, tracker_canister_id).await {
+                ic_cdk::println!("Prometheus usage beacon failed: {error}");
+            }
         });
     }));
 }
@@ -144,7 +149,7 @@ fn take_report(state: &Rc<RefCell<BeaconState>>, end_timestamp_ns: i64) -> Optio
             tools.iter().map(|(tool_id, call_count)| CallerActivity {
                 caller: *caller,
                 tool_id: tool_id.clone(),
-                call_count: *call_count,
+                call_count: Nat::from(*call_count),
             })
         })
         .collect();
@@ -152,8 +157,8 @@ fn take_report(state: &Rc<RefCell<BeaconState>>, end_timestamp_ns: i64) -> Optio
     Some(PendingReport {
         usage_data,
         stats: UsageStats {
-            start_timestamp_ns,
-            end_timestamp_ns,
+            start_timestamp_ns: Int::from(start_timestamp_ns),
+            end_timestamp_ns: Int::from(end_timestamp_ns),
             activity,
         },
     })
@@ -187,11 +192,12 @@ where
         Some(report) => report,
         None => return Ok(()),
     };
-    let last_send_timestamp_ns = report.stats.end_timestamp_ns;
+    let last_send_timestamp_ns = end_timestamp_ns;
 
     match sender(tracker_canister_id, report.stats).await {
         Ok(()) => {
-            state.borrow_mut().last_send_timestamp_ns = last_send_timestamp_ns;
+            let mut state = state.borrow_mut();
+            state.last_send_timestamp_ns = state.last_send_timestamp_ns.max(last_send_timestamp_ns);
             Ok(())
         }
         Err(error) => {
@@ -276,11 +282,11 @@ mod tests {
         assert_eq!(result, Ok(()));
         let (called_tracker, stats) = captured.borrow_mut().take().unwrap();
         assert_eq!(called_tracker, tracker);
-        assert_eq!(stats.start_timestamp_ns, 10);
-        assert_eq!(stats.end_timestamp_ns, 25);
+        assert_eq!(stats.start_timestamp_ns, Int::from(10));
+        assert_eq!(stats.end_timestamp_ns, Int::from(25));
         assert_eq!(stats.activity.len(), 1);
         assert_eq!(stats.activity[0].tool_id, "search");
-        assert_eq!(stats.activity[0].call_count, 2);
+        assert_eq!(stats.activity[0].call_count, Nat::from(2u64));
         assert!(context.state.borrow().usage_data.is_empty());
         assert_eq!(context.state.borrow().last_send_timestamp_ns, 25);
     }
@@ -308,5 +314,23 @@ mod tests {
             Some(&1)
         );
         assert_eq!(state.last_send_timestamp_ns, 0);
+    }
+
+    #[test]
+    fn usage_stats_round_trips_as_unbounded_candid_numbers() {
+        let stats = UsageStats {
+            start_timestamp_ns: Int::from(-10),
+            end_timestamp_ns: Int::from(25),
+            activity: vec![CallerActivity {
+                caller: Principal::from_text("2vxsx-fae").unwrap(),
+                tool_id: "search".to_string(),
+                call_count: Nat::from(u64::MAX),
+            }],
+        };
+
+        let encoded = candid::encode_one(&stats).unwrap();
+        let decoded: UsageStats = candid::decode_one(&encoded).unwrap();
+
+        assert_eq!(decoded, stats);
     }
 }
