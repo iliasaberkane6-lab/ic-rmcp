@@ -88,6 +88,13 @@ pub fn init(owner: Principal) -> ApiKeyContext {
 ///
 /// The returned hexadecimal value is the only raw-key representation produced
 /// by this module. The store receives only its SHA-256 digest and metadata.
+/// `caller` must come from a verified canister call context (normally
+/// `ic_cdk::caller()`), never from client-supplied request data.
+///
+/// Testing the `raw_rand` failure branch requires PocketIC-style integration
+/// infrastructure that can inject a management-canister failure. Unit tests
+/// use the deterministic internal helper so they do not make an inter-canister
+/// call.
 pub async fn create_my_api_key(
     context: &ApiKeyContext,
     caller: Principal,
@@ -108,6 +115,9 @@ pub async fn create_my_api_key(
 }
 
 /// Lists only the metadata belonging to `caller`.
+///
+/// `caller` must come from a verified canister call context (normally
+/// `ic_cdk::caller()`), never from client-supplied request data.
 pub fn list_my_api_keys(context: &ApiKeyContext, caller: Principal) -> Vec<ApiKeyMetadata> {
     let mut metadata: Vec<_> = context
         .state
@@ -128,6 +138,8 @@ pub fn list_my_api_keys(context: &ApiKeyContext, caller: Principal) -> Vec<ApiKe
 ///
 /// Revoking an unknown key is idempotent. A key belonging to another
 /// principal returns [`ApiKeyError::Unauthorized`] and remains untouched.
+/// `caller` must come from a verified canister call context (normally
+/// `ic_cdk::caller()`), never from client-supplied request data.
 pub fn revoke_my_api_key(
     context: &ApiKeyContext,
     caller: Principal,
