@@ -13,6 +13,9 @@ mod handler;
 /// Per-request context and the main trait you implement to define your MCP server behavior.
 pub use handler::{Context, Handler};
 
+/// Optional usage reporting for Prometheus Protocol-compatible MCP servers.
+pub mod beacon;
+
 mod server;
 /// Entry points for handling Streamable HTTP requests to your MCP server.
 pub use server::Server;
