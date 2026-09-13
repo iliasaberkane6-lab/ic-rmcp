@@ -13,6 +13,8 @@ mod handler;
 /// Per-request context and the main trait you implement to define your MCP server behavior.
 pub use handler::{Context, Handler};
 
+/// Self-service API-key storage with hashed credentials and ownership checks.
+pub mod api_key;
 mod server;
 /// Entry points for handling Streamable HTTP requests to your MCP server.
 pub use server::Server;
