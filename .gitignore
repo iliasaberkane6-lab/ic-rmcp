@@ -6,3 +6,6 @@ examples/*/.env
 examples/*/.dfx
 
 .vscode
+# Local test artifacts (pocket-ic binary, ledger wasm) — not for review
+test-assets/
+.DS_Store

@@ -19,6 +19,9 @@ pub use server::Server;
 
 mod state;
 
+/// Owner management and ICRC-1 treasury functions for MCP canisters.
+pub mod treasury;
+
 /// OAuth configuration types for protecting your MCP server and advertising metadata.
 pub use handler::oauth::{IssuerConfig, OAuthConfig};
 /// Helper to generate a JSON Schema for a Rust type to describe tool parameters.

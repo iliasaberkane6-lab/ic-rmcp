@@ -1,0 +1,15 @@
+[package]
+name = "treasury"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+candid = "0.10"
+ic-cdk = "0.18"
+
+ic-rmcp = { path = "../../ic-rmcp" }
+serde = { version = "1", features = ["derive"] }
